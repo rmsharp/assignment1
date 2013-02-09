@@ -1,0 +1,272 @@
+\documentclass[12pt,a4paper,article]{memoir} % for a short document
+\usepackage{amssymb,amsmath}
+\usepackage[urlcolor=blue]{hyperref} % URLs etc
+%\usepackage{enumitem}
+\usepackage{enumerate}
+\usepackage{colortbl}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{underscore}
+\usepackage{titling}
+\usepackage{fixltx2e} % allows text subscripts
+\newcommand{\subtitle}[1]{%
+  \posttitle{%
+    \par\end{center}
+    \begin{center}\large#1\end{center}
+    \vskip0.5em}%
+}
+\usepackage{soul}
+\makeatletter
+\DeclareRobustCommand*\myul{%
+    \def\SOUL@everyspace{\underline{\space}\kern\z@}
+    \def\SOUL@everytoken{%
+     \setbox0=\hbox{\the\SOUL@token}%
+     \ifdim\dp0>\z@
+        \the\SOUL@token
+     \else
+        \underline{\the\SOUL@token}%
+     \fi}
+\SOUL@}
+\makeatother
+% from Louis01012009 (sharpBibtex.bib)
+\newcommand{\estse}[2]{${#1}_{(#2)}$}
+\newcommand{\cithree}[3]{$_{{#1}\ }{#2}_{\ {#3}}$}
+\newcommand{\cifive}[5]{$_{_{#1\ }{#2}\ \!}{#3}_{\ #4_{\ #5}}$}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\filename}[1]{\texttt{#1}}
+\newcommand{\rpackage}[1]{\textit{#1}}
+\usepackage[top = 1.5in, bottom = 1.5in, left = 1in, right = 0.75in]{geometry}
+\hypersetup{urlcolor=blue}
+% See the ``Memoir customise'' template for some common customisations
+% Don't forget to read the Memoir manual: memman.pdf
+
+\title{}
+\subtitle{Data Analysis: Assignment 1}
+\author{R. Mark Sharp}
+\date{\today}
+
+%%% BEGIN DOCUMENT
+\begin{document}
+\maketitle
+
+<<set_options, echo = FALSE, include = FALSE>>=
+options(continue = " ")
+options(width = 60)
+opts_chunk$set(autodep = TRUE)
+opts_chunk$set(concordance=TRUE)
+opts_chunk$set(keep.source=TRUE, eps = FALSE)
+opts_chunk$set(echo = TRUE, cache = FALSE, include = TRUE, tidy = FALSE)
+@
+<<setup_timer, echo = FALSE, include = FALSE>>=
+## should be in a "source" file
+require(stringr, quietly = TRUE)
+start_time <- proc.time()
+get_elapsed_time_str <- function (start_time) {
+  # To use: collect the start_time at the beginning of the script with 
+  # start_time <- proc.time()
+  # At the end call this function using start_time as the sole argument
+  # elapsed_time <- get_elapsed_time_str(start_time)
+  total_seconds <- (proc.time()[[3]] - start_time[[3]])
+  total_minutes <- total_seconds / 60
+  hours <- floor(total_minutes / 60)
+  minutes <- floor(total_minutes - hours * 60)
+  seconds <- round(total_seconds - (hours * 3600) - (minutes * 60), 0)
+  hours_str <- ifelse(hours > 0, str_c(hours, " hours, "), '')
+  minutes_str <- ifelse(minutes > 0, str_c(minutes, " minutes and "), '')
+  seconds_str <- str_c(seconds, " seconds.")
+  str_c(hours_str, minutes_str, seconds_str)
+}
+@
+<<load_packagesE, echo = FALSE, include = FALSE>>=
+##I use the following packages frequently. 
+not_installed <- function(mypkg) !is.element(mypkg, installed.packages()[,1])
+require(stringr, quietly = TRUE)
+require(xtable, quietly = TRUE)
+require(testthat, quietly = TRUE)
+@
+\section{Reading in and Examining the Two Sources of Data}
+The Instruction (See Appendix) for this assignment indicated two source of
+data for this assignment. I have chosen to load both and compare them.
+<<load_data>>=
+loansData_csv <- read.table("./data/loansData.csv", sep = ",", header = TRUE)
+load("./data/loansData.rda")
+all.equal(loansData, loansData_csv)
+str(loansData_csv)
+str(loansData)
+all.equal(loansData, loansData_csv, check.attributes = FALSE)
+@
+Examination of the output of \code{str()} for the data frame created 
+(I will call it loansData\_csv) when reading in 
+\filename{loansData.csv} and the 
+\code{loansData} data frame created when loading \filename{loansData.rda}
+indicates that 
+the \filename{loansData.csv} was likely created from \filename{loansData.rda}. 
+Many of the attributes within \code{loansData} indicate that this data frame 
+is a cleaned up data set. For example, the attributes of 
+\code{loansData\$Interest.Rate} says there are 430 levels while 
+\code{loansData\_csv\$Interest.Rate} says there are 275, which agrees with the 
+number of interest rates actually in both data frames 
+(\code{length(unique(loansData\$Interest.Rate))} and 
+\code{length(loansData\_csv\$Interest.Rate))}). 
+Thus, other than the metadata about the factors, the resulting data 
+frames are identical.
+
+The following code is used to copy the provided data frame into one with 
+a shorter name and one in which I can coerce the data into classes that
+will be more useful for examining and analyzing the data provided.
+
+I use the \rpackage{testthat} package function, \code{expect\_equal()} 
+to show that I get what I am expecting.
+
+<<coercion_of_data>>=
+ld <- loansData
+ld$Interest.Rate <- as.numeric(str_sub(as.character(
+  ld$Interest.Rate), 1, -2))
+expect_equal(ld$Interest.Rate[1:3], c(8.9, 12.12, 21.98))
+ld$Debt.To.Income.Ratio <- as.numeric(str_sub(as.character(
+  ld$Debt.To.Income.Ratio), 1, -2))
+expect_equal(ld$Debt.To.Income.Ratio[1:3], c(14.9, 28.36, 23.81))
+ld$FICO.lower <- as.integer(str_sub(as.character(ld$FICO.Range), 1, 3))
+ld$FICO.higher <- as.integer(str_sub(as.character(ld$FICO.Range), 5))
+expect_equal(ld$FICO.lower[1:3], c(735, 715, 690))
+expect_equal(ld$FICO.higher[1:3], c(739, 719, 694))
+
+## Change the unordered factors to integers and change "n/a" to NA
+ld$Employment.Length <- str_sub(ld$Employment.Length, 1, 1)
+ld$Employment.Length <- ifelse(ld$Employment.Length == "<", "0", 
+                               ld$Employment.Length)
+## There is no actual Employment.Lenght == 99 
+## so I am using it as a placeholder
+ld$Employment.Length <- ifelse(ld$Employment.Length == "n", "99", 
+                              ld$Employment.Length)
+ld$Employment.Length <- as.integer(ld$Employment.Length)
+ld$Employment.Length[which(ld$Employment.Length == 99)] <- NA
+expect_equal(as.vector(table(ld$Employment.Length)), 
+             c(250, 830, 244, 235, 192, 202, 163, 127, 108, 72))
+
+## Reorder the Home.Ownership factor so that it can be used as a
+## meaningful ordinal variable.
+ld$Home.Ownership <- 
+  factor(ld$Home.Ownership, 
+         levels = c("OWN", "MORTGAGE", "RENT", "OTHER", "NONE"))
+@
+\begin{figure}
+<<rawPlot1, fig.height = 8, fig.width = 8, echo = FALSE>>=
+par(mfrow = c(4, 4))
+hist(ld$Amount.Requested, xlab = "Amt Requested", main = "")
+hist(log(ld$Amount.Requested + 1), xlab = "Log(Amt Requested)", main = "")
+hist(ld$Amount.Funded.By.Investors, xlab = "Amt Funded", main = "")
+hist(log(ld$Amount.Funded.By.Investors + 1), xlab = "Log(Amt Funded)", main = "")
+hist(ld$Interest.Rate, xlab = "Interest Rate", main = "")
+hist(log(ld$Interest.Rate + 1), xlab = "log(Interest Rate)", main = "")
+hist(ld$Debt.To.Income.Ratio, xlab = "Debt to Income Ratio", main = "")
+hist(log(ld$Debt.To.Income.Ratio + 1), xlab = "Log(Debt to Income Ratio)", 
+     main = "")
+hist(ld$Monthly.Income, xlab = "Monthly Income", main = "")
+hist(log(ld$Monthly.Income + 1), xlab = "Log(Monthly Income)", main = "")
+hist(ld$FICO.lower, xlab = "FICO Lower", main = "")
+hist(log(ld$FICO.lower + 1), xlab = "Log(FICO Lower)", main = "")
+hist(ld$Revolving.CREDIT.Balance, xlab = "Credit Balance", main = "")
+hist(log(ld$Revolving.CREDIT.Balance + 1), xlab = "Log(Credit Balance)", main = "")
+hist(ld$Inquiries.in.the.Last.6.Months, xlab = "Inquiries", main = "")
+hist(log(ld$Inquiries.in.the.Last.6.Months + 1), 
+     xlab = "Log(Inquiries)", main = "")
+@
+\caption{Histograms of nominal raw data. Log transforms are included to 
+see if they are of benefit. The code for the plots has not been echoed to
+the PDF file, but is in the ``rawPlot1'' code chunk. See the caption for
+Figure~\ref{rawhist2}.}
+\label{rawhist1}
+\end{figure}
+\begin{figure}
+<<rawPlot2, fig.height = 8, fig.width = 8>>=
+par(mfrow = c(2, 2))
+hist(ld$Employment.Length, xlab = "Employment Length", main = "")
+hist(log(ld$Employment.Length + 1), xlab = "Log(Employment Length)", main = "")
+hist(ld$Open.CREDIT.Lines, xlab = "Open Credit Lines", main = "")
+hist(log(ld$Open.CREDIT.Lines + 1), xlab = "Log(Open Credit Lines)", main = "")
+@
+\caption{Histograms of nominal data. Log transforms are included to 
+see if they are of benefit. The code for the plots has been echoed to
+the PDF file and is very similar to that found in the
+``rawPlot1'' code chunk referred to in the caption of Figure~\ref{rawhist1}.}
+\label{rawhist2}
+\end{figure}
+
+\begin{figure}
+<<rawPlot3, fig.height = 5, fig.width = 8>>=
+par(mfrow = c(1, 3))
+hist(as.integer(ld$Loan.Length), xlab = "Loan Length", main = "")
+hist(as.integer(ld$Loan.Purpose), xlab = "Loan Purpose", main = "")
+hist(as.integer(ld$Home.Ownership), xlab = "Home Ownership", main = "")
+@
+\caption{Histograms of catagorical data.}
+\label{rawhist3}
+\end{figure}
+
+\section*{Appendix - Instructions}
+\subsection*{Data}
+For this analysis you will use the loans data available from here:\\
+\\
+\url{https://spark-public.s3.amazonaws.com/dataanalysis/loansData.csv}\\
+\url{https://spark-public.s3.amazonaws.com/dataanalysis/loansData.rda}\\
+\\
+There is a code book for the variables in the data set available here:\\
+\\
+\url{https://spark-public.s3.amazonaws.com/dataanalysis/loansCodebook.pdf}\\
+
+\subsection{Prompt}
+
+The data above consist of a sample of 2,500 peer-to-peer loans issued 
+through the Lending Club (https://www.lendingclub.com/home.action). 
+The interest rate of these loans is determined by the Lending Club on the 
+basis of characteristics of the person asking for the loan such as their 
+employment history, credit history, and creditworthiness scores. 
+
+The purpose of your analysis is to identify and quantify associations 
+between the interest rate of the loan and the other variables in the data set. 
+In particular, you should consider whether any of these variables have 
+an important association with interest rate after taking into account the 
+applicant's FICO score. For example, if two people have the same FICO score, 
+can the other variables explain a difference in interest rate between them?
+
+\subsection{What you should submit}
+
+Your data analysis submission will consist of the following components:
+\begin{enumerate}[1.]
+  \item The main text of your document including a numbered list of references. 
+This can be uploaded either as a pdf document or typed into the text box 
+(not both!). The limit for the text and references is 2000 words. 
+Your main text should be written in the form of an essay with an introduction, 
+methods, results, and conclusions section. 
+
+  \item One figure for your data analysis uploaded as a .png, .jpg, 
+  or .pdf file, along with a figure caption of up to 500 words. 
+
+\end{enumerate}
+
+\subsection{Reproducibility}
+
+Due to security concerns with the exchange of R code, you will no longer 
+be asked to submit code to reproduce your analyses. 
+I still believe reproducibility is a key component of data analysis and 
+I encourage you to create reproducible code for your data analysis. 
+
+\subsection{Submission Deadline}
+
+You must submit your data analysis by February 18th, 2013 at 7:00AM UTC-5:00 
+(Baltimore time). No late days may be applied to the data analysis. 
+Note that this is an extension of the original date posted on the class website. 
+
+Please either enter the body of your data analysis in the text box or upload 
+a pdf file with your analysis. This file should both contain the main text 
+of your analysis and the numbered list of references. It may be no more 
+than 2000 words. 
+<<calculate_elapsed_time, echo = FALSE, include = FALSE>>=
+elapsed_time <- get_elapsed_time_str(start_time)
+@
+\clearpage
+The current date and time is \Sexpr{Sys.time()}. The processing time for
+this document was \Sexpr{elapsed_time}
+
+\end{document}
